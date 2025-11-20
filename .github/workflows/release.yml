@@ -1,0 +1,47 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "*"
+
+permissions:
+  contents: write
+
+env:
+  GO_VERSION: "1.24"
+
+jobs:
+  manual-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Install go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Perform cross builds
+        run: make cross
+
+      - name: Compress binaries
+        run: |
+          cd out
+          TAG=${GITHUB_REF#refs/tags/}
+          tar czf evm-wallet_${TAG}_darwin_amd64.tar.gz evm-wallet_darwin_amd64/
+          tar czf evm-wallet_${TAG}_linux_amd64.tar.gz evm-wallet_linux_amd64/
+
+      - name: Get git tag
+        run: echo "tag=$(git describe --tags --exact-match HEAD)" >> $GITHUB_ENV
+
+      - name: Publish binaries
+        uses: svenstaro/upload-release-action@04733e069f2d7f7f0b4aebc4fbdbce8613b03ccd # 2.9.0
+        with:
+          repo_token: ${{ secrets.RELEASE_TOKEN }}
+          tag: ${{ env.tag }}
+          release_name: ${{ env.tag }}
+          file_glob: true
+          file: out/*.tar.gz
+          overwrite: true
